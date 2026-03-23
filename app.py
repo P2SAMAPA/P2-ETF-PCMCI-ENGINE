@@ -367,11 +367,15 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
         render_causal_links(signal)
         st.markdown("---")
 
-    # Fixed window uses its actual test period (last 15% of history)
+    # Fixed window uses its actual test period (last 15% of full history)
     # Shrinking window uses fixed OOS (2025-01-01 → today)
+    fw  = signal.get("fixed_window", {})
+    sw  = signal.get("shrinking_window", {})
+
     n_total    = len(master) if not master.empty else 4582
     n_test     = int(n_total * 0.15)
-    test_start = str(master.index[-n_test].date()) if not master.empty else "~2021"
+    test_start = fw.get("test_start") or \
+                 (str(master.index[-n_test].date()) if not master.empty else "2023-01-01")
     oos_start  = cfg.LIVE_START
     oos_end    = str(master.index[-1].date()) if not master.empty else "today"
 
