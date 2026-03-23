@@ -145,16 +145,14 @@ def run_option(option: str) -> dict:
         }
 
     # ── Best overall signal ────────────────────────────────────────────────────
-    # Shrinking window must beat fixed by at least 2% ann return to switch
-    MIN_MARGIN = 0.02
+    # Pure comparison: highest OOS ann return wins
     fixed_ann  = fixed_oos.get("ann_return", -999)
     window_ann = best_window.get("oos_ann_return", -999)
 
     print(f"\n  [debug] Fixed window: pick={fixed_pick} | OOS return={fixed_ann*100:.2f}%")
     print(f"  [debug] Best shrinking: pick={best_window.get('top_pick','?')} | OOS return={window_ann*100:.2f}%")
-    print(f"  [debug] Margin needed: {MIN_MARGIN*100:.1f}% | Available: {(window_ann-fixed_ann)*100:.2f}%")
 
-    if window_ann > fixed_ann + MIN_MARGIN:
+    if window_ann > fixed_ann:
         best_pick    = best_window["top_pick"]
         best_source  = f"Shrinking Window {best_window['window_id']}"
         best_scores  = best_window["scores"]
