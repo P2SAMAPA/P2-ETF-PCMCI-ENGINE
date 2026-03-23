@@ -4,4 +4,5 @@ pyarrow
 scikit-learn
 tigramite
 huggingface_hub
+pandas-market-calendars
 tqdm
