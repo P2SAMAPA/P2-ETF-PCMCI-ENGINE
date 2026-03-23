@@ -386,13 +386,22 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
             f"<div class='period-badge'>Test: {test_start} → {oos_end}</div>",
             unsafe_allow_html=True,
         )
-        render_metrics(bt_f)
+        # Use pre-computed metrics from signal JSON
+        fw_bt = {
+            "m": {
+                "ar": fw.get("oos_return", 0),
+                "av": 0,
+                "sh": fw.get("oos_sharpe", 0),
+                "dd": fw.get("max_dd", 0),
+                "hr": fw.get("hit_rate", 0),
+            }
+        }
+        render_metrics(fw_bt)
         render_curve(bt_f, key=f"{option}_fixed")
-        oos_r = fw.get("oos_return", 0)
-        shr   = fw.get("oos_sharpe", 0)
         st.markdown(
             f"<div class='fn'>Pick: {fw.get('pick','—')} &nbsp;·&nbsp; "
-            f"OOS Return: {oos_r*100:.2f}% &nbsp;·&nbsp; Sharpe: {shr:.3f}</div>",
+            f"OOS Return: {fw.get('oos_return',0)*100:.2f}% &nbsp;·&nbsp; "
+            f"Sharpe: {fw.get('oos_sharpe',0):.3f}</div>",
             unsafe_allow_html=True,
         )
 
@@ -408,13 +417,22 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
                 f"</div>",
                 unsafe_allow_html=True,
             )
-        render_metrics(bt_w)
+        # Use pre-computed metrics from signal JSON
+        sw_bt = {
+            "m": {
+                "ar": sw.get("oos_return", 0),
+                "av": 0,
+                "sh": sw.get("oos_sharpe", 0),
+                "dd": sw.get("oos_max_dd", 0),
+                "hr": sw.get("oos_hit_rate", 0),
+            }
+        }
+        render_metrics(sw_bt)
         render_curve(bt_w, key=f"{option}_window")
-        oos_r = sw.get("oos_return", 0)
-        shr   = sw.get("oos_sharpe", 0)
         st.markdown(
             f"<div class='fn'>Pick: {sw.get('pick','—')} &nbsp;·&nbsp; "
-            f"OOS Return: {oos_r*100:.2f}% &nbsp;·&nbsp; Sharpe: {shr:.3f}</div>",
+            f"OOS Return: {sw.get('oos_return',0)*100:.2f}% &nbsp;·&nbsp; "
+            f"Sharpe: {sw.get('oos_sharpe',0):.3f}</div>",
             unsafe_allow_html=True,
         )
 
