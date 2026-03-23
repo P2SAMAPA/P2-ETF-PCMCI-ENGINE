@@ -85,6 +85,7 @@ MIN_LINK_STRENGTH = 0.05
 MOMENTUM_WINDOWS   = [5, 21, 63]   # days
 MOMENTUM_WEIGHT    = 0.3            # 30% momentum, 70% causal centrality
 CONVICTION_THRESHOLD = 0.15         # min score gap to have conviction
+MIN_WINNER_MARGIN    = 0.02         # shrinking window must beat fixed by 2% ann return to win
 
 # ── Local dirs ─────────────────────────────────────────────────────────────────
 RESULTS_DIR = "results"
