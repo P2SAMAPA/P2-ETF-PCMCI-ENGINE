@@ -145,18 +145,24 @@ def run_option(option: str) -> dict:
         }
 
     # ── Best overall signal ────────────────────────────────────────────────────
-    # Pick best between fixed and shrinking window by OOS return
-    if (best_window.get("oos_ann_return", -999) >
-            fixed_oos.get("ann_return", -999)):
-        best_pick   = best_window["top_pick"]
-        best_source = f"Shrinking Window {best_window['window_id']}"
-        best_scores = best_window["scores"]
-        best_ann_ret = best_window["oos_ann_return"]
+    fixed_ann  = fixed_oos.get("ann_return", -999)
+    window_ann = best_window.get("oos_ann_return", -999)
+
+    print(f"\n  [debug] Fixed window: pick={fixed_pick} | OOS return={fixed_ann*100:.2f}%")
+    print(f"  [debug] Best shrinking: pick={best_window.get('top_pick','?')} | OOS return={window_ann*100:.2f}%")
+
+    if window_ann > fixed_ann:
+        best_pick    = best_window["top_pick"]
+        best_source  = f"Shrinking Window {best_window['window_id']}"
+        best_scores  = best_window["scores"]
+        best_ann_ret = window_ann
+        print(f"  [debug] Winner: Shrinking Window ({best_pick})")
     else:
-        best_pick   = fixed_pick
-        best_source = "Fixed Window"
-        best_scores = fixed_scores
-        best_ann_ret = fixed_oos["ann_return"]
+        best_pick    = fixed_pick
+        best_source  = "Fixed Window"
+        best_scores  = fixed_scores
+        best_ann_ret = fixed_ann
+        print(f"  [debug] Winner: Fixed Window ({best_pick})")
 
     # Conviction = score gap between top and second pick
     scores_series = pd.Series(best_scores).sort_values(ascending=False)
