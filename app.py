@@ -76,18 +76,15 @@ st.markdown("""
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800)
 def load_signals() -> dict:
     try:
-        path = hf_hub_download(
-            repo_id=cfg.HF_RESULTS_REPO,
-            filename="results/latest_signals.json",
-            repo_type="dataset",
-            token=cfg.HF_TOKEN or None,
-            force_download=True,
-        )
-        with open(path) as f:
-            raw = json.load(f)
+        import requests
+        url = f"https://huggingface.co/datasets/{cfg.HF_RESULTS_REPO}/resolve/main/results/latest_signals.json"
+        headers = {"Authorization": f"Bearer {cfg.HF_TOKEN}"} if cfg.HF_TOKEN else {}
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        raw = r.json()
         return {
             "A": raw.get("option_A") or {},
             "B": raw.get("option_B") or {},
@@ -117,18 +114,16 @@ def load_master() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800)
 def load_history(option: str) -> pd.DataFrame:
     try:
-        path = hf_hub_download(
-            repo_id=cfg.HF_RESULTS_REPO,
-            filename=f"results/signal_history_{option}.json",
-            repo_type="dataset",
-            token=cfg.HF_TOKEN or None,
-            force_download=True,
-        )
-        with open(path) as f:
-            return pd.DataFrame(json.load(f))
+        import requests
+        url = (f"https://huggingface.co/datasets/{cfg.HF_RESULTS_REPO}"
+               f"/resolve/main/results/signal_history_{option}.json")
+        headers = {"Authorization": f"Bearer {cfg.HF_TOKEN}"} if cfg.HF_TOKEN else {}
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        return pd.DataFrame(r.json())
     except Exception:
         return pd.DataFrame()
 
