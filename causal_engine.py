@@ -267,16 +267,8 @@ def run_window_analysis(
     window_start: str,
     window_end: str = None,
 ) -> dict:
-    """
-    Run PCMCI+ on a specific date window.
-    Returns causal result + centrality scores.
-    """
     end = window_end or cfg.TRAIN_END
-    mask = (returns.index >= window_start) & (returns.index <= end)
-
-    ret_w = returns[mask]
-    mac_w = macro[macro.index >= window_start][macro.index <= end] \
-            if hasattr(macro.index, '__len__') else macro[mask]
+    ret_w = returns[(returns.index >= window_start) & (returns.index <= end)]
     mac_w = macro[(macro.index >= window_start) & (macro.index <= end)]
 
     if len(ret_w) < cfg.MIN_WINDOW:
@@ -284,7 +276,9 @@ def run_window_analysis(
 
     causal_result = run_pcmci(ret_w, mac_w, tickers)
     centrality    = compute_centrality(causal_result)
-    scores        = build_signal_scores(causal_result, returns, tickers)
+
+    # Use window-sliced returns for momentum too — fixes length mismatch
+    scores = build_signal_scores(causal_result, ret_w, tickers)
 
     return {
         "window_start":   window_start,
