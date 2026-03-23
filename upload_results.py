@@ -1,22 +1,23 @@
 # upload_results.py — Push results to HuggingFace results repo
-# Uses proven upload_file pattern (same as data_upload_hf.py in DeePM)
 
 import glob
 import os
-from huggingface_hub import HfApi, CommitOperationAdd
+from huggingface_hub import HfApi
 import config as cfg
 
 
 def upload_results() -> None:
-    token = cfg.HF_TOKEN
-    if not token:
-        raise ValueError("HF_TOKEN is not set — check GitHub secrets.")
+    # Read directly from environment — most reliable in GitHub Actions
+    token   = os.environ.get("HF_TOKEN", "") or cfg.HF_TOKEN
+    repo_id = os.environ.get("HF_RESULTS_REPO", "") or cfg.HF_RESULTS_REPO
 
-    repo_id = cfg.HF_RESULTS_REPO
+    if not token:
+        raise ValueError("HF_TOKEN is not set.")
     if not repo_id:
-        raise ValueError("HF_RESULTS_REPO is not set — check GitHub secrets.")
+        raise ValueError("HF_RESULTS_REPO is not set.")
 
     print(f"Uploading to: {repo_id}")
+    print(f"Token present: {bool(token)}, length: {len(token)}")
 
     result_files = glob.glob(os.path.join(cfg.RESULTS_DIR, "*.json"))
     if not result_files:
@@ -27,13 +28,13 @@ def upload_results() -> None:
 
     for f in result_files:
         repo_path = f"results/{os.path.basename(f)}"
-        print(f"  Uploading {os.path.basename(f)} → {repo_path}")
+        print(f"  Uploading {os.path.basename(f)} -> {repo_path}")
         api.upload_file(
             path_or_fileobj=f,
             path_in_repo=repo_path,
             repo_id=repo_id,
             repo_type="dataset",
-            commit_message=f"[auto] Update {os.path.basename(f)}",
+            commit_message=f"[auto] Update PCMCI+ results",
         )
 
     print(f"Pushed {len(result_files)} file(s) to {repo_id}")
