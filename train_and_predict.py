@@ -44,14 +44,15 @@ def evaluate_oos(pick: str, oos_returns: pd.DataFrame) -> dict:
 
     r = oos_returns[pick].fillna(0.0)
     ar = float(r.mean() * 252)
-    av = float(r.std() * np.sqrt(252) + 1e-8)
-    sh = ar / av
+    av = float(r.std() * np.sqrt(252))
+    sh = ar / (av + 1e-8)
     curve = (1 + r).cumprod()
     dd = float(((curve - curve.cummax()) / curve.cummax()).min())
     hr = float((r > 0).mean())
 
     return {
         "ann_return": round(ar, 4),
+        "ann_vol":    round(av, 4),
         "sharpe":     round(sh, 4),
         "hit_rate":   round(hr, 4),
         "max_dd":     round(dd, 4),
@@ -127,6 +128,7 @@ def run_option(option: str) -> dict:
 
             oos_perf = evaluate_oos(result["top_pick"], oos_ret)
             result["oos_ann_return"] = oos_perf["ann_return"]
+            result["oos_ann_vol"]    = oos_perf["ann_vol"]
             result["oos_sharpe"]     = oos_perf["sharpe"]
             result["oos_hit_rate"]   = oos_perf["hit_rate"]
             result["oos_max_dd"]     = oos_perf["max_dd"]
@@ -214,6 +216,7 @@ def run_option(option: str) -> dict:
             "scores":     {k: round(float(v), 4) for k, v in fixed_scores.items()},
             "test_start": str(test_start.date()),
             "oos_return": fixed_oos["ann_return"],
+            "oos_vol":    fixed_oos["ann_vol"],
             "oos_sharpe": fixed_oos["sharpe"],
             "hit_rate":   fixed_oos["hit_rate"],
             "max_dd":     fixed_oos["max_dd"],
@@ -227,6 +230,7 @@ def run_option(option: str) -> dict:
             "scores":              {k: round(float(v), 4)
                                     for k, v in best_window.get("scores", {}).items()},
             "oos_return":          best_window.get("oos_ann_return", 0.0),
+            "oos_vol":             best_window.get("oos_ann_vol", 0.0),
             "oos_sharpe":          best_window.get("oos_sharpe", 0.0),
             "oos_hit_rate":        best_window.get("oos_hit_rate", 0.0),
             "oos_max_dd":          best_window.get("oos_max_dd", 0.0),
