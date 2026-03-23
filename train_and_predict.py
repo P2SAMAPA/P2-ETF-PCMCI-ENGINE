@@ -128,6 +128,8 @@ def run_option(option: str) -> dict:
             oos_perf = evaluate_oos(result["top_pick"], oos_ret)
             result["oos_ann_return"] = oos_perf["ann_return"]
             result["oos_sharpe"]     = oos_perf["sharpe"]
+            result["oos_hit_rate"]   = oos_perf["hit_rate"]
+            result["oos_max_dd"]     = oos_perf["max_dd"]
             result["window_id"]      = w["id"]
             window_results.append(result)
 
@@ -226,6 +228,8 @@ def run_option(option: str) -> dict:
                                     for k, v in best_window.get("scores", {}).items()},
             "oos_return":          best_window.get("oos_ann_return", 0.0),
             "oos_sharpe":          best_window.get("oos_sharpe", 0.0),
+            "oos_hit_rate":        best_window.get("oos_hit_rate", 0.0),
+            "oos_max_dd":          best_window.get("oos_max_dd", 0.0),
             "all_windows":         [
                 {
                     "window_id":    w["window_id"],
