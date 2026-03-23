@@ -390,7 +390,7 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
         fw_bt = {
             "m": {
                 "ar": fw.get("oos_return", 0),
-                "av": 0,
+                "av": fw.get("oos_vol", 0),
                 "sh": fw.get("oos_sharpe", 0),
                 "dd": fw.get("max_dd", 0),
                 "hr": fw.get("hit_rate", 0),
@@ -421,7 +421,7 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
         sw_bt = {
             "m": {
                 "ar": sw.get("oos_return", 0),
-                "av": 0,
+                "av": sw.get("oos_vol", 0),
                 "sh": sw.get("oos_sharpe", 0),
                 "dd": sw.get("oos_max_dd", 0),
                 "hr": sw.get("oos_hit_rate", 0),
