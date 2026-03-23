@@ -367,16 +367,13 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
         render_causal_links(signal)
         st.markdown("---")
 
-    # Compute periods
+    # Fixed window uses its actual test period (last 15% of history)
+    # Shrinking window uses fixed OOS (2025-01-01 → today)
     n_total    = len(master) if not master.empty else 4582
     n_test     = int(n_total * 0.15)
     test_start = str(master.index[-n_test].date()) if not master.empty else "~2021"
-    test_end   = str(master.index[-1].date()) if not master.empty else "today"
     oos_start  = cfg.LIVE_START
-    oos_end    = test_end
-
-    fw  = signal.get("fixed_window", {})
-    sw  = signal.get("shrinking_window", {})
+    oos_end    = str(master.index[-1].date()) if not master.empty else "today"
 
     bt_f = build_bt(fw.get("pick", ""), master, option, start_date=test_start)
     bt_w = build_bt(sw.get("pick", ""), master, option, start_date=oos_start)
@@ -387,7 +384,7 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
         st.markdown("<div class='label-fixed'>Fixed Window</div>",
                     unsafe_allow_html=True)
         st.markdown(
-            f"<div class='period-badge'>Test: {test_start} → {test_end}</div>",
+            f"<div class='period-badge'>Test: {test_start} → {oos_end}</div>",
             unsafe_allow_html=True,
         )
         render_metrics(bt_f)
