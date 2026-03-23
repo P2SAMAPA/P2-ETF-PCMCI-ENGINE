@@ -1,8 +1,7 @@
+streamlit==1.44.0
 pandas
 numpy
 pyarrow
-scikit-learn
-tigramite
+plotly
 huggingface_hub
-pandas-market-calendars
-tqdm
+altair>=5.0.0
