@@ -11,6 +11,12 @@ REPO_TYPE = "dataset"
 
 
 def upload_results() -> None:
+    if not cfg.HF_TOKEN:
+        raise ValueError("HF_TOKEN is not set — check GitHub secrets.")
+    if not cfg.HF_RESULTS_REPO:
+        raise ValueError("HF_RESULTS_REPO is not set — check GitHub secrets.")
+
+    print(f"Uploading to: {cfg.HF_RESULTS_REPO}")
     result_files = glob.glob(os.path.join(cfg.RESULTS_DIR, "*.json"))
 
     if not result_files:
