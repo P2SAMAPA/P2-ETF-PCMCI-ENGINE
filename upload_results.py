@@ -34,8 +34,6 @@ def upload_results() -> None:
     if not operations:
         return
 
-    api.create_repo(repo_id=REPO_ID, repo_type=REPO_TYPE,
-                    exist_ok=True, private=False)
     api.create_commit(
         repo_id=REPO_ID,
         repo_type=REPO_TYPE,
