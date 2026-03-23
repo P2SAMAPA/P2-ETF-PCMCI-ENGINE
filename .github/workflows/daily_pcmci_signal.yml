@@ -42,6 +42,5 @@ jobs:
           HF_TOKEN:        ${{ secrets.HF_TOKEN }}
           HF_RESULTS_REPO: ${{ secrets.HF_RESULTS_REPO }}
         run: python upload_results.py
-
       - name: Done
         run: echo "PCMCI+ pipeline complete."
