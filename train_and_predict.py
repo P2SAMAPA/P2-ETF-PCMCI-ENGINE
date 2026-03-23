@@ -92,12 +92,18 @@ def run_option(option: str) -> dict:
         window_end=cfg.TRAIN_END,
     )
 
-    fixed_pick    = fixed_result["top_pick"] if fixed_result else tickers[0]
-    fixed_scores  = fixed_result["scores"]   if fixed_result else {}
-    fixed_oos     = evaluate_oos(fixed_pick, oos_ret)
+    # Fixed window — evaluate on its actual test set (last 15% of full data)
+    n_total    = len(returns)
+    n_test     = int(n_total * 0.15)
+    test_start = returns.index[-n_test]
+    test_ret   = returns[returns.index >= test_start]
+
+    fixed_pick  = fixed_result["top_pick"] if fixed_result else tickers[0]
+    fixed_scores = fixed_result["scores"]  if fixed_result else {}
+    fixed_oos   = evaluate_oos(fixed_pick, test_ret)
 
     print(f"  Fixed pick: {fixed_pick} | "
-          f"OOS return: {fixed_oos['ann_return']*100:.2f}%")
+          f"Test return ({test_start.date()}→today): {fixed_oos['ann_return']*100:.2f}%")
 
     # ── 2. Shrinking windows ───────────────────────────────────────────────────
     print(f"\n[2/2] Shrinking windows ({len(cfg.WINDOWS)} windows)...")
@@ -204,6 +210,7 @@ def run_option(option: str) -> dict:
         "fixed_window": {
             "pick":       fixed_pick,
             "scores":     {k: round(float(v), 4) for k, v in fixed_scores.items()},
+            "test_start": str(test_start.date()),
             "oos_return": fixed_oos["ann_return"],
             "oos_sharpe": fixed_oos["sharpe"],
             "hit_rate":   fixed_oos["hit_rate"],
