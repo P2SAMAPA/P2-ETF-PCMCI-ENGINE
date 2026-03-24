@@ -13,6 +13,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pandas_market_calendars as mcal
+from huggingface_hub import HfApi, hf_hub_download
 
 import config as cfg
 import loader
@@ -57,6 +58,51 @@ def evaluate_oos(pick: str, oos_returns: pd.DataFrame) -> dict:
         "hit_rate":   round(hr, 4),
         "max_dd":     round(dd, 4),
     }
+
+
+# ── History management with HF persistence ─────────────────────────────────────
+
+def _load_remote_history(option: str) -> list:
+    """Download existing history from Hugging Face, if available."""
+    try:
+        # Attempt to download the history file from the results repo
+        local_path = hf_hub_download(
+            repo_id=cfg.HF_RESULTS_REPO,
+            filename=f"results/signal_history_{option}.json",
+            repo_type="dataset",
+            token=cfg.HF_TOKEN or None,
+            local_dir=cfg.RESULTS_DIR,
+            local_dir_use_symlinks=False,
+        )
+        with open(local_path) as f:
+            return json.load(f)
+    except Exception:
+        # No existing history – start fresh
+        return []
+
+
+def update_history(result: dict, option: str) -> None:
+    """Append today's signal to history, preserving remote history."""
+    # Load existing history from HF (if any)
+    history = _load_remote_history(option)
+
+    record = {
+        "signal_date":  result["signal_date"],
+        "pick":         result["pick"],
+        "conviction":   result["conviction"],
+        "source":       result["source"],
+        "generated_at": result["generated_at"],
+    }
+
+    # Avoid duplicates by date
+    if record["signal_date"] not in {r["signal_date"] for r in history}:
+        history.append(record)
+
+    # Save locally (will be uploaded later by upload_results.py)
+    history_path = os.path.join(cfg.RESULTS_DIR, f"signal_history_{option}.json")
+    with open(history_path, "w") as f:
+        json.dump(history, f, indent=2)
+    print(f"[predict] History: {len(history)} records for Option {option}")
 
 
 # ── Main pipeline ──────────────────────────────────────────────────────────────
@@ -252,30 +298,6 @@ def run_option(option: str) -> dict:
           f"Conviction: {conviction:.3f} | OOS return: {best_ann_ret*100:.2f}%")
 
     return result
-
-
-def update_history(result: dict, option: str) -> None:
-    """Append today's signal to history file."""
-    history_path = os.path.join(cfg.RESULTS_DIR, f"signal_history_{option}.json")
-    history = []
-    if os.path.exists(history_path):
-        with open(history_path) as f:
-            history = json.load(f)
-
-    record = {
-        "signal_date":  result["signal_date"],
-        "pick":         result["pick"],
-        "conviction":   result["conviction"],
-        "source":       result["source"],
-        "generated_at": result["generated_at"],
-    }
-    existing = {r["signal_date"] for r in history}
-    if record["signal_date"] not in existing:
-        history.append(record)
-
-    with open(history_path, "w") as f:
-        json.dump(history, f, indent=2)
-    print(f"[predict] History: {len(history)} records for Option {option}")
 
 
 def save_results(result_A: dict = None, result_B: dict = None) -> None:
