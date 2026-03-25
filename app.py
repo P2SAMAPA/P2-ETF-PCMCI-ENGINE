@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from huggingface_hub import hf_hub_download
-import pandas_market_calendars as mcal   # for proper trading days
+import pandas_market_calendars as mcal
 
 import config as cfg
 
@@ -196,24 +196,24 @@ def render_hero(signal: dict, option: str, master: pd.DataFrame):
     pick       = signal["pick"]
     conviction = signal.get("conviction", 0)
     source     = signal.get("source", "—")
-    last_data_date = signal.get("last_data_date", None)
     gen        = signal.get("generated_at", "")
     method     = signal.get("causal_method", "pcmci+")
 
-    # Compute correct next trading day
-    if last_data_date and last_data_date != "—":
-        try:
-            last = pd.Timestamp(last_data_date)
-            next_day = next_trading_day(last)
-            sig_date = next_day.strftime("%Y-%m-%d")
-        except Exception:
-            sig_date = last_data_date
+    # Compute correct next trading day from the master dataset's last date
+    if not master.empty:
+        last_data_date = master.index[-1]
+        next_day = next_trading_day(last_data_date)
+        sig_date = next_day.strftime("%Y-%m-%d")
     else:
-        # Fallback: use the last date in master dataset
-        if not master.empty:
-            last = master.index[-1]
-            next_day = next_trading_day(last)
-            sig_date = next_day.strftime("%Y-%m-%d")
+        # fallback: use signal's last_data_date if master not available
+        last = signal.get("last_data_date")
+        if last:
+            try:
+                last_date = pd.Timestamp(last)
+                next_day = next_trading_day(last_date)
+                sig_date = next_day.strftime("%Y-%m-%d")
+            except Exception:
+                sig_date = last
         else:
             sig_date = "—"
 
