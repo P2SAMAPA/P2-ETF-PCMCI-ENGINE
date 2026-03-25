@@ -3,13 +3,14 @@
 # Two tabs: Option A (FI) | Option B (Equity)
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from huggingface_hub import hf_hub_download
+import pandas_market_calendars as mcal   # for proper trading days
 
 import config as cfg
 
@@ -72,6 +73,24 @@ st.markdown("""
   .sec-hdr  { font-size:20px; font-weight:700; color:#1a1a2e; margin:28px 0 12px 0; }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ── Helper: next trading day (with NYSE calendar) ─────────────────────────────
+
+nyse = mcal.get_calendar("NYSE")
+
+def next_trading_day(date: pd.Timestamp) -> pd.Timestamp:
+    """Return the next NYSE trading day after the given date."""
+    schedule = nyse.schedule(start_date=date, end_date=date + timedelta(days=10))
+    trading_days = schedule.index
+    next_days = trading_days[trading_days > date]
+    if len(next_days) > 0:
+        return next_days[0]
+    # fallback: skip weekends only
+    d = date + timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
 
 
 # ── Data loading ───────────────────────────────────────────────────────────────
@@ -165,7 +184,7 @@ def build_bt(pick: str, master: pd.DataFrame, option: str,
 
 # ── UI components ──────────────────────────────────────────────────────────────
 
-def render_hero(signal: dict, option: str):
+def render_hero(signal: dict, option: str, master: pd.DataFrame):
     if not signal or "pick" not in signal:
         st.info("Signal not available yet — run the workflow first.")
         return
@@ -177,9 +196,26 @@ def render_hero(signal: dict, option: str):
     pick       = signal["pick"]
     conviction = signal.get("conviction", 0)
     source     = signal.get("source", "—")
-    sig_date   = signal.get("signal_date", "—")
+    last_data_date = signal.get("last_data_date", None)
     gen        = signal.get("generated_at", "")
     method     = signal.get("causal_method", "pcmci+")
+
+    # Compute correct next trading day
+    if last_data_date and last_data_date != "—":
+        try:
+            last = pd.Timestamp(last_data_date)
+            next_day = next_trading_day(last)
+            sig_date = next_day.strftime("%Y-%m-%d")
+        except Exception:
+            sig_date = last_data_date
+    else:
+        # Fallback: use the last date in master dataset
+        if not master.empty:
+            last = master.index[-1]
+            next_day = next_trading_day(last)
+            sig_date = next_day.strftime("%Y-%m-%d")
+        else:
+            sig_date = "—"
 
     try:
         gen = datetime.fromisoformat(gen).strftime("%Y-%m-%d %H:%M UTC")
@@ -354,8 +390,8 @@ def render_option(option: str, signals: dict, master: pd.DataFrame):
     signal = signals.get(option, {})
     hist   = load_history(option)
 
-    # Hero
-    render_hero(signal, option)
+    # Hero (pass master for date calculation)
+    render_hero(signal, option, master)
 
     # Causal links — full width
     if signal.get("top_causal_links"):
