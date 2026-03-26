@@ -36,6 +36,22 @@ def next_trading_day(from_date: str = None) -> str:
     return str(future[0].date()) if future else str((base + pd.Timedelta(days=1)).date())
 
 
+def _get_actual_return(pick: str, signal_date: str, simple_ret: pd.DataFrame) -> tuple:
+    """
+    Return (actual_return, hit) for the pick on the signal_date.
+    If the date is not in simple_ret or the column is missing, returns (None, None).
+    """
+    try:
+        date = pd.Timestamp(signal_date)
+        if date in simple_ret.index and pick in simple_ret.columns:
+            ret = simple_ret.loc[date, pick]
+            if not np.isnan(ret):
+                return float(ret), bool(ret > 0)
+    except Exception:
+        pass
+    return None, None
+
+
 # ── OOS evaluation ─────────────────────────────────────────────────────────────
 
 def evaluate_oos(pick: str, oos_returns: pd.DataFrame) -> dict:
@@ -81,17 +97,28 @@ def _load_remote_history(option: str) -> list:
         return []
 
 
-def update_history(result: dict, option: str) -> None:
-    """Append today's signal to history, preserving remote history."""
+def update_history(result: dict, option: str, simple_ret: pd.DataFrame) -> None:
+    """
+    Append today's signal to history, preserving remote history.
+    Also store actual return and hit status if the signal date is in the past.
+    """
     # Load existing history from HF (if any)
     history = _load_remote_history(option)
 
+    signal_date = result["signal_date"]
+    pick = result["pick"]
+
+    # Get actual return and hit from simple returns (if date already known)
+    actual_return, hit = _get_actual_return(pick, signal_date, simple_ret)
+
     record = {
-        "signal_date":  result["signal_date"],
-        "pick":         result["pick"],
-        "conviction":   result["conviction"],
-        "source":       result["source"],
-        "generated_at": result["generated_at"],
+        "signal_date":   signal_date,
+        "pick":          pick,
+        "conviction":    result["conviction"],
+        "source":        result["source"],
+        "generated_at":  result["generated_at"],
+        "actual_return": actual_return,
+        "hit":           hit,
     }
 
     # Avoid duplicates by date
@@ -121,13 +148,16 @@ def run_option(option: str) -> dict:
     # Load data
     data = loader.get_option_data(option)
     tickers    = data["tickers"]
-    returns    = data["returns"]
+    returns    = data["returns"]          # log returns
     macro      = data["macro"]
     train_ret  = data["train_ret"]
     train_mac  = data["train_macro"]
     oos_ret    = data["oos_ret"]
     last_date  = str(returns.index[-1].date())
     signal_date = next_trading_day(last_date)
+
+    # Simple returns for actual return lookup
+    simple_ret = data["simple_ret"]       # simple returns per ticker
 
     # ── 1. Fixed window — full training history ────────────────────────────────
     print(f"\n[1/2] Fixed window PCMCI+ ({cfg.TRAIN_END} training cutoff)...")
@@ -294,6 +324,9 @@ def run_option(option: str) -> dict:
         },
     }
 
+    # Update history with actual return (if available)
+    update_history(result, option, simple_ret)
+
     print(f"\n  Final pick: {best_pick} | Source: {best_source} | "
           f"Conviction: {conviction:.3f} | OOS return: {best_ann_ret*100:.2f}%")
 
@@ -319,8 +352,7 @@ def save_results(result_A: dict = None, result_B: dict = None) -> None:
         if res:
             with open(os.path.join(cfg.RESULTS_DIR, name), "w") as f:
                 json.dump(res, f, indent=2)
-            update_history(res, opt)
-
+            # History already updated in run_option, no need to repeat
     print(f"[predict] Results saved to {cfg.RESULTS_DIR}/")
 
 
