@@ -133,6 +133,27 @@ def update_history(result: dict, option: str, master: pd.DataFrame) -> None:
     print(f"[predict] History: {len(history)} records for Option {option}")
 
 
+# ── Load master dataset (simple returns) ───────────────────────────────────────
+def load_master() -> pd.DataFrame:
+    """Load the full master.parquet dataset from HF."""
+    try:
+        local = hf_hub_download(
+            repo_id=cfg.HF_DATASET_REPO,
+            filename=cfg.FILE_MASTER,
+            repo_type="dataset",
+            token=cfg.HF_TOKEN or None,
+            force_download=True,
+        )
+        df = pd.read_parquet(local)
+        if "Date" in df.columns:
+            df = df.set_index("Date")
+        df.index = pd.to_datetime(df.index)
+        return df.sort_index()
+    except Exception as e:
+        print(f"[loader] Failed to load master: {e}")
+        return pd.DataFrame()
+
+
 # ── Main pipeline ──────────────────────────────────────────────────────────────
 
 def run_option(option: str) -> dict:
@@ -146,9 +167,11 @@ def run_option(option: str) -> dict:
     print(f"PCMCI+ Pipeline — Option {'A (FI)' if option == 'A' else 'B (Equity)'}")
     print(f"{'='*60}")
 
-    # Load data
+    # Load master dataset for actual returns
+    master = load_master()
+
+    # Load option data (log returns, macro, etc.)
     data = loader.get_option_data(option)
-    master = loader.load_master()                     # full master dataset (simple returns)
     tickers    = data["tickers"]
     returns    = data["returns"]          # log returns
     macro      = data["macro"]
@@ -230,7 +253,6 @@ def run_option(option: str) -> dict:
         }
 
     # ── Best overall signal ────────────────────────────────────────────────────
-    # Pure comparison: highest OOS ann return wins
     fixed_ann  = fixed_oos.get("ann_return", -999)
     window_ann = best_window.get("oos_ann_return", -999)
 
