@@ -36,15 +36,16 @@ def next_trading_day(from_date: str = None) -> str:
     return str(future[0].date()) if future else str((base + pd.Timedelta(days=1)).date())
 
 
-def _get_actual_return(pick: str, signal_date: str, simple_ret: pd.DataFrame) -> tuple:
+def _get_actual_return(pick: str, signal_date: str, master: pd.DataFrame) -> tuple:
     """
     Return (actual_return, hit) for the pick on the signal_date.
-    If the date is not in simple_ret or the column is missing, returns (None, None).
+    Uses the simple return column f"{pick}_ret" from the master DataFrame.
     """
     try:
         date = pd.Timestamp(signal_date)
-        if date in simple_ret.index and pick in simple_ret.columns:
-            ret = simple_ret.loc[date, pick]
+        col = f"{pick}_ret"
+        if col in master.columns and date in master.index:
+            ret = master.loc[date, col]
             if not np.isnan(ret):
                 return float(ret), bool(ret > 0)
     except Exception:
@@ -97,7 +98,7 @@ def _load_remote_history(option: str) -> list:
         return []
 
 
-def update_history(result: dict, option: str, simple_ret: pd.DataFrame) -> None:
+def update_history(result: dict, option: str, master: pd.DataFrame) -> None:
     """
     Append today's signal to history, preserving remote history.
     Also store actual return and hit status if the signal date is in the past.
@@ -108,8 +109,8 @@ def update_history(result: dict, option: str, simple_ret: pd.DataFrame) -> None:
     signal_date = result["signal_date"]
     pick = result["pick"]
 
-    # Get actual return and hit from simple returns (if date already known)
-    actual_return, hit = _get_actual_return(pick, signal_date, simple_ret)
+    # Get actual return and hit from master (simple returns)
+    actual_return, hit = _get_actual_return(pick, signal_date, master)
 
     record = {
         "signal_date":   signal_date,
@@ -147,6 +148,7 @@ def run_option(option: str) -> dict:
 
     # Load data
     data = loader.get_option_data(option)
+    master = loader.load_master()                     # full master dataset (simple returns)
     tickers    = data["tickers"]
     returns    = data["returns"]          # log returns
     macro      = data["macro"]
@@ -155,9 +157,6 @@ def run_option(option: str) -> dict:
     oos_ret    = data["oos_ret"]
     last_date  = str(returns.index[-1].date())
     signal_date = next_trading_day(last_date)
-
-    # Simple returns for actual return lookup
-    simple_ret = data["simple_ret"]       # simple returns per ticker
 
     # ── 1. Fixed window — full training history ────────────────────────────────
     print(f"\n[1/2] Fixed window PCMCI+ ({cfg.TRAIN_END} training cutoff)...")
@@ -324,8 +323,8 @@ def run_option(option: str) -> dict:
         },
     }
 
-    # Update history with actual return (if available)
-    update_history(result, option, simple_ret)
+    # Update history with actual return (using master DataFrame)
+    update_history(result, option, master)
 
     print(f"\n  Final pick: {best_pick} | Source: {best_source} | "
           f"Conviction: {conviction:.3f} | OOS return: {best_ann_ret*100:.2f}%")
@@ -352,7 +351,6 @@ def save_results(result_A: dict = None, result_B: dict = None) -> None:
         if res:
             with open(os.path.join(cfg.RESULTS_DIR, name), "w") as f:
                 json.dump(res, f, indent=2)
-            # History already updated in run_option, no need to repeat
     print(f"[predict] Results saved to {cfg.RESULTS_DIR}/")
 
 
