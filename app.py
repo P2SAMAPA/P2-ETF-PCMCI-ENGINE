@@ -334,17 +334,34 @@ def render_history(hist_df: pd.DataFrame, master: pd.DataFrame):
         st.info("Signal history will appear after the first run.")
         return
 
-    if "actual_return" not in hist_df.columns and not master.empty:
+    # Recalculate actual_return if not present or if last_data_date exists
+    if not master.empty:
         def get_ret(row):
             try:
-                date = pd.Timestamp(row["signal_date"])
-                col  = f"{row['pick']}_ret"
-                if col in master.columns and date in master.index:
+                pick = row.get("pick", "")
+                if not pick:
+                    return np.nan
+
+                col = f"{pick}_ret"
+                if col not in master.columns:
+                    return np.nan
+
+                # Use last_data_date for lookup if available (preferred)
+                # Otherwise fall back to signal_date
+                date_str = row.get("last_data_date") or row.get("signal_date")
+                if not date_str:
+                    return np.nan
+
+                date = pd.Timestamp(date_str)
+                if date in master.index:
                     return master.loc[date, col]
             except Exception:
                 pass
             return np.nan
-        hist_df["actual_return"] = hist_df.apply(get_ret, axis=1)
+
+        # Only recalculate if actual_return is missing for any row
+        if "actual_return" not in hist_df.columns or hist_df["actual_return"].isna().any():
+            hist_df["actual_return"] = hist_df.apply(get_ret, axis=1)
 
     if "hit" not in hist_df.columns and "actual_return" in hist_df.columns:
         hist_df["hit"] = hist_df["actual_return"].apply(
