@@ -36,16 +36,34 @@ def next_trading_day(from_date: str = None) -> str:
     return str(future[0].date()) if future else str((base + pd.Timedelta(days=1)).date())
 
 
-def _get_actual_return(pick: str, signal_date: str, master: pd.DataFrame) -> tuple:
+def _get_actual_return(pick: str, signal_date: str, master: pd.DataFrame, last_data_date: str = None) -> tuple:
     """
-    Return (actual_return, hit) for the pick on the signal_date.
-    Uses the simple return column f"{pick}_ret" from the master DataFrame.
+    Return (actual_return, hit) for the pick.
+
+    For NEW signals (signal_date is in the future): returns None, None
+    For PAST signals (signal_date is in master data): returns actual return and hit
+
+    The actual return is looked up for the last_data_date (last available data date),
+    NOT the signal_date (which may be a future date).
     """
     try:
-        date = pd.Timestamp(signal_date)
+        if master.empty:
+            return None, None
+
+        # If signal_date is a future date (not in master), we can't compute actual return yet
+        # Use last_data_date for the lookup instead
+        if last_data_date:
+            lookup_date = pd.Timestamp(last_data_date)
+        else:
+            lookup_date = pd.Timestamp(signal_date)
+
+        # If the lookup date is not in master index, we don't have the return data yet
+        if lookup_date not in master.index:
+            return None, None
+
         col = f"{pick}_ret"
-        if col in master.columns and date in master.index:
-            ret = master.loc[date, col]
+        if col in master.columns:
+            ret = master.loc[lookup_date, col]
             if not np.isnan(ret):
                 return float(ret), bool(ret > 0)
     except Exception:
@@ -102,24 +120,29 @@ def update_history(result: dict, option: str, master: pd.DataFrame) -> None:
     """
     Append today's signal to history, preserving remote history.
     Also store actual return and hit status if the signal date is in the past.
+
+    For new signals (signal_date in future): actual_return will be None until data arrives.
+    For past signals (signal_date in master data): actual_return is computed from last_data_date.
     """
     # Load existing history from HF (if any)
     history = _load_remote_history(option)
 
     signal_date = result["signal_date"]
+    last_data_date = result.get("last_data_date")
     pick = result["pick"]
 
-    # Get actual return and hit from master (simple returns)
-    actual_return, hit = _get_actual_return(pick, signal_date, master)
+    # Get actual return and hit from master (uses last_data_date for lookup)
+    actual_return, hit = _get_actual_return(pick, signal_date, master, last_data_date)
 
     record = {
-        "signal_date":   signal_date,
-        "pick":          pick,
-        "conviction":    result["conviction"],
-        "source":        result["source"],
-        "generated_at":  result["generated_at"],
-        "actual_return": actual_return,
-        "hit":           hit,
+        "signal_date":    signal_date,
+        "last_data_date": last_data_date,  # Track this for reference
+        "pick":           pick,
+        "conviction":     result["conviction"],
+        "source":         result["source"],
+        "generated_at":   result["generated_at"],
+        "actual_return":  actual_return,
+        "hit":            hit,
     }
 
     # Avoid duplicates by date
