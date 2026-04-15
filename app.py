@@ -75,38 +75,37 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── Helper: next trading day (with NYSE calendar) ─────────────────────────────
+# ── Helper: next trading day (NYSE) – robust version ─────────────────────────
 
 nyse = mcal.get_calendar("NYSE")
 
 def next_trading_day(date: pd.Timestamp) -> pd.Timestamp:
     """
     Return the next NYSE trading day strictly after the given date.
-    This is the date for which the signal is intended (next market open).
+    Uses NYSE calendar and handles timezones correctly.
     """
-    # Normalise to a naive date (timezone‑free)
+    # Convert to naive UTC date at midnight
     if hasattr(date, 'tz') and date.tz is not None:
         date = date.tz_convert("UTC").tz_localize(None)
-    date = date.normalize()  # set to midnight
+    date = date.normalize()  # midnight
 
-    # Start searching from the day after the given date
+    # Start searching from the next calendar day
     search_start = date + timedelta(days=1)
-    
-    # Get a schedule for a reasonable window (e.g., next 10 days)
-    schedule = nyse.schedule(start_date=search_start, end_date=search_start + timedelta(days=10))
-    trading_days = schedule.index
-    
-    # If there are trading days in that window, return the first one
-    if len(trading_days) > 0:
-        # Ensure naive timestamp
-        next_day = trading_days[0].normalize()
+    # Look ahead up to 20 days (safely covers any gap including long holidays)
+    search_end = search_start + timedelta(days=20)
+
+    # Get valid trading days as a list of naive dates
+    schedule = nyse.schedule(start_date=search_start, end_date=search_end)
+    if not schedule.empty:
+        # The first index is the first trading day in the range
+        next_day = schedule.index[0].normalize()
         if next_day.tz is not None:
             next_day = next_day.tz_localize(None)
         return next_day
-    
-    # Fallback: skip weekends manually (rare)
+
+    # Fallback: skip weekends (should never happen for NYSE)
     d = search_start
-    while d.weekday() >= 5:  # 5=Saturday, 6=Sunday
+    while d.weekday() >= 5:
         d += timedelta(days=1)
     return d
 
@@ -145,9 +144,10 @@ def load_master() -> pd.DataFrame:
         if "Date" in df.columns:
             df = df.set_index("Date")
         df.index = pd.to_datetime(df.index)
-        # Ensure timezone‑naive for consistent comparisons
+        # Force naive UTC dates for consistency
         if df.index.tz is not None:
             df.index = df.index.tz_convert("UTC").tz_localize(None)
+        df.index = df.index.normalize()
         return df.sort_index()
     except Exception as e:
         st.error(f"Could not load master dataset: {e}")
@@ -220,11 +220,15 @@ def render_hero(signal: dict, option: str, master: pd.DataFrame):
     gen        = signal.get("generated_at", "")
     method     = signal.get("causal_method", "pcmci+")
 
-    # Compute correct next trading day from the master dataset's last date
+    # --- DATE CALCULATION (the critical part) ---
     if not master.empty:
         last_data_date = master.index[-1]
         next_day = next_trading_day(last_data_date)
         sig_date = next_day.strftime("%Y-%m-%d")
+        
+        # DEBUG: uncomment these two lines to see what's happening
+        # st.write(f"DEBUG: last_data_date = {last_data_date}")
+        # st.write(f"DEBUG: next_day = {next_day}")
     else:
         # fallback: use signal's last_data_date if master not available
         last = signal.get("last_data_date")
