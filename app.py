@@ -80,15 +80,33 @@ st.markdown("""
 nyse = mcal.get_calendar("NYSE")
 
 def next_trading_day(date: pd.Timestamp) -> pd.Timestamp:
-    """Return the next NYSE trading day after the given date."""
-    schedule = nyse.schedule(start_date=date, end_date=date + timedelta(days=10))
+    """
+    Return the next NYSE trading day strictly after the given date.
+    This is the date for which the signal is intended (next market open).
+    """
+    # Normalise to a naive date (timezone‑free)
+    if hasattr(date, 'tz') and date.tz is not None:
+        date = date.tz_convert("UTC").tz_localize(None)
+    date = date.normalize()  # set to midnight
+
+    # Start searching from the day after the given date
+    search_start = date + timedelta(days=1)
+    
+    # Get a schedule for a reasonable window (e.g., next 10 days)
+    schedule = nyse.schedule(start_date=search_start, end_date=search_start + timedelta(days=10))
     trading_days = schedule.index
-    next_days = trading_days[trading_days > date]
-    if len(next_days) > 0:
-        return next_days[0]
-    # fallback: skip weekends only
-    d = date + timedelta(days=1)
-    while d.weekday() >= 5:
+    
+    # If there are trading days in that window, return the first one
+    if len(trading_days) > 0:
+        # Ensure naive timestamp
+        next_day = trading_days[0].normalize()
+        if next_day.tz is not None:
+            next_day = next_day.tz_localize(None)
+        return next_day
+    
+    # Fallback: skip weekends manually (rare)
+    d = search_start
+    while d.weekday() >= 5:  # 5=Saturday, 6=Sunday
         d += timedelta(days=1)
     return d
 
@@ -127,6 +145,9 @@ def load_master() -> pd.DataFrame:
         if "Date" in df.columns:
             df = df.set_index("Date")
         df.index = pd.to_datetime(df.index)
+        # Ensure timezone‑naive for consistent comparisons
+        if df.index.tz is not None:
+            df.index = df.index.tz_convert("UTC").tz_localize(None)
         return df.sort_index()
     except Exception as e:
         st.error(f"Could not load master dataset: {e}")
