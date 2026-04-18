@@ -40,6 +40,10 @@ EQ_ETFS = [
     "XLP",   # Consumer Staples
     "XLU",   # Utilities
     "GDX",   # Gold Miners
+    "IWF",
+    "IWM",
+    "XSD",
+    "XBI",
     "XME",   # Metals & Mining
 ]
 EQ_BENCHMARK = "SPY"
