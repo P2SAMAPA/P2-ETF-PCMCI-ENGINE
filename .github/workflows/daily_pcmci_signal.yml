@@ -2,7 +2,7 @@ name: Daily PCMCI+ Signal
 
 on:
   schedule:
-    - cron: "0 23 * * 1-5"   # 23:00 UTC Mon-Fri (after DeePM at 22:30)
+    - cron: "0 02 * * 1-5"   # 2:00 UTC Mon-Fri (after DeePM at 01:00)
   workflow_dispatch:
     inputs:
       option:
